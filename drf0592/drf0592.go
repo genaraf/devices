@@ -130,10 +130,10 @@ func New(bus i2c.Bus, opts *Opts) (*Dev, error) {
 	return dev, nil
 }
 
-func (drv *Dev) Close() {
-	if drv != nil {
-		drv.MotorStop(M1)
-		drv.MotorStop(M2)
+func (dev *Dev) Close() {
+	if dev != nil {
+		dev.MotorStop(M1)
+		dev.MotorStop(M2)
 	}
 }
 

@@ -27,15 +27,17 @@ func TestDev_MotorMovement(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	m.SetMoterPwmFrequency(1000)
+	m.SetMoterPwmFrequency(1500)
 
-	for i := int(10); i <= 100; i += 10 {
+	for i := float32(10); i <= 100; i += 10 {
 		m.MotorMovement(M1, CW, i)
 		m.MotorMovement(M2, CCW, i)
+		fmt.Printf("M1 speed: %.2f\n", i)
+		fmt.Printf("M2 speed: %.2f\n", i)
 		time.Sleep(2 * time.Second)
-		fmt.Printf("M1 speed: %d\n", i)
-		fmt.Printf("M2 speed: %d\n", i)
 	}
+
+	time.Sleep(2 * time.Second)
 	m.MotorStop(M1)
 	m.MotorStop(M2)
 	m.Close()
