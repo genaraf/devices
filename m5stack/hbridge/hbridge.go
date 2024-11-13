@@ -1,41 +1,41 @@
 package hbridge
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 
-	"periph.io/x/conn/v3/gpio"
 	"periph.io/x/conn/v3/i2c"
-	"periph.io/x/conn/v3/physic"
-	"periph.io/x/devices/v3/pca9685"
 )
-
-// I2CAddr is the default I2C address for the ws15364 components.
-const I2CAddr uint16 = 0x20
 
 const (
-	_PWMA_CHANNEL = int(0)
-	_AIN1_CHANNEL = int(1)
-	_AIN2_CHANNEL = int(2)
-	_PWMB_CHANNEL = int(5)
-	_BIN1_CHANNEL = int(3)
-	_BIN2_CHANNEL = int(4)
+	HBRIDGE_I2C_ADDR               = 0x20
+	HBRIDGE_CONFIG_REG             = 0x00
+	HBRIDGE_MOTOR_ADC_8BIT_REG     = 0x10
+	HBRIDGE_MOTOR_ADC_12BIT_REG    = 0x20
+	HBRIDGE_MOTOR_CURRENT_REG      = 0x30
+	HBRIDGE_JUMP_TO_BOOTLOADER_REG = 0xFD
+	HBRIDGE_FW_VERSION_REG         = 0xFE
+	HBRIDGE_I2C_ADDRESS_REG        = 0xFF
 )
 
-// Enum motor ID
-type MotorId byte
+type HbridgeDirection int
 
 const (
-	M1 MotorId = 0x01
-	M2 MotorId = 0x02
+	HBRIDGE_STOP HbridgeDirection = iota
+	HBRIDGE_FORWARD
+	HBRIDGE_BACKWARD
 )
 
-// Orientation
-type Direction byte
+type HbridgeAnalogReadMode int
 
 const (
-	CW  Direction = 0x01 // clockwise
-	CCW Direction = 0x02 // countclockwise
+	_8bit HbridgeAnalogReadMode = iota
+	_12bit
 )
+
+// I2CAddr is the default I2C address for the m5stack ultrasnic.
+const I2CAddr uint16 = HBRIDGE_I2C_ADDR
 
 // Opts holds the configuration options.
 type Opts struct {
@@ -52,7 +52,6 @@ var DefaultOpts = Opts{
 // Dev is an handle to an DFR0592 Motors driver.
 type Dev struct {
 	c i2c.Dev
-	d *pca9685.Dev
 }
 
 // New creates a new driver for CCS811 VOC sensor.
@@ -62,92 +61,97 @@ func New(bus i2c.Bus, opts *Opts) (*Dev, error) {
 	}
 
 	dev := &Dev{c: i2c.Dev{Bus: bus, Addr: opts.I2cAddress}}
-	var err error
-	dev.d, err = pca9685.NewI2C(bus, dev.c.Addr)
-	if err != nil {
-		return nil, err
-	}
+	dev.SetDriverDirection(HBRIDGE_STOP)
 
-	if err := dev.SetMoterPwmFrequency(opts.PwmFreq); err != nil {
-		return nil, err
-	}
-
-	// init channels
-	if err := dev.d.SetAllPwm(0, 0); err != nil {
-		return nil, err
-	}
-	dev.MotorStop(M1)
-	dev.MotorStop(M2)
 	return dev, nil
 }
 
 func (dev *Dev) Close() {
 	if dev != nil {
-		dev.MotorStop(M1)
-		dev.MotorStop(M2)
+		dev.SetDriverDirection(HBRIDGE_STOP)
 	}
 }
 
-func (dev *Dev) SetMoterPwmFrequency(frequency int16) error {
-	if frequency < 50 || frequency > 1526 {
-		return fmt.Errorf("frequency out of range: 50-1526")
-	}
-	if err := dev.d.SetPwmFreq(physic.Frequency(frequency) * physic.Hertz); err != nil {
-		return err
-	}
-	return nil
+func (h *Dev) readBytes(reg int, size int) ([]uint8, error) {
+	r := make([]byte, size)
+	err := h.c.Tx([]byte{byte(reg)}, r)
+	return r, err
 }
 
-// Motor movement
-// id: MotorId          Motor Id M1 or M2
-// direction: Direction Motor orientation, CW (clockwise) or CCW (counterclockwise)
-// speed: float         Motor pwm duty cycle, in range 0 to 100, otherwise no effective
-func (dev *Dev) MotorMovement(id MotorId, direction Direction, speed float32) error {
-	if direction != CW && direction != CCW {
-		return fmt.Errorf("wrond direction parameter")
-	}
-	if speed < 0 || speed > 100 {
-		return fmt.Errorf("speed out of range: 0-100")
-	}
-	s := gpio.Duty((4095.0 / 100.0) * speed)
-	if id == M1 {
-		dev.d.SetPwm(_PWMA_CHANNEL, 0, s)
-		//		dev.d.SetFullOn(_PWMA_CHANNEL)
-		if direction == CW {
-			dev.d.SetFullOff(_AIN1_CHANNEL)
-			dev.d.SetFullOn(_AIN2_CHANNEL)
-		} else {
-			dev.d.SetFullOn(_AIN1_CHANNEL)
-			dev.d.SetFullOff(_AIN2_CHANNEL)
-		}
-	} else if id == M2 {
-		dev.d.SetPwm(_PWMB_CHANNEL, 0, s)
-		//		dev.d.SetFullOn(_PWMB_CHANNEL)
-		if direction == CW {
-			dev.d.SetFullOff(_BIN1_CHANNEL)
-			dev.d.SetFullOn(_BIN2_CHANNEL)
-		} else {
-			dev.d.SetFullOn(_BIN1_CHANNEL)
-			dev.d.SetFullOff(_BIN2_CHANNEL)
-		}
+func (h *Dev) writeBytes(reg uint8, data []uint8) error {
+	d := []byte{byte(reg)}
+	d = append(d, data...)
+	return h.c.Tx(d, nil)
+}
+
+func (h *Dev) GetDriverDirection() (uint8, error) {
+	data, err := h.readBytes(HBRIDGE_CONFIG_REG, 1)
+	return data[0], err
+}
+
+func (h *Dev) GetDriverSpeed8Bits() (uint8, error) {
+	data, err := h.readBytes(HBRIDGE_CONFIG_REG+1, 1)
+	return data[0], err
+}
+
+func (h *Dev) GetDriverSpeed16Bits() (uint16, error) {
+	data, err := h.readBytes(HBRIDGE_CONFIG_REG+2, 2)
+	return binary.LittleEndian.Uint16(data), err
+}
+
+func (h *Dev) GetDriverPWMFreq() (uint16, error) {
+	data, err := h.readBytes(HBRIDGE_CONFIG_REG+4, 2)
+	return binary.LittleEndian.Uint16(data), err
+}
+
+func (h *Dev) SetDriverPWMFreq(freq uint16) error {
+	data := []uint8{uint8(freq & 0xff), uint8((freq >> 8) & 0xff)}
+	return h.writeBytes(HBRIDGE_CONFIG_REG+4, data)
+}
+
+func (h *Dev) SetDriverDirection(dir HbridgeDirection) error {
+	data := []uint8{uint8(dir)}
+	return h.writeBytes(HBRIDGE_CONFIG_REG, data)
+}
+
+func (h *Dev) SetDriverSpeed8Bits(speed uint8) error {
+	data := []uint8{speed}
+	return h.writeBytes(HBRIDGE_CONFIG_REG+1, data)
+}
+
+func (h *Dev) SetDriverSpeed16Bits(speed uint16) error {
+	data := []uint8{uint8(speed), uint8(speed >> 8)}
+	return h.writeBytes(HBRIDGE_CONFIG_REG+2, data)
+}
+
+func (h *Dev) GetAnalogInput(bit HbridgeAnalogReadMode) uint16 {
+	if bit == _8bit {
+		data, _ := h.readBytes(HBRIDGE_MOTOR_ADC_8BIT_REG, 1)
+		return uint16(data[0])
 	} else {
-		return fmt.Errorf("wrong motor id")
+		data, _ := h.readBytes(HBRIDGE_MOTOR_ADC_12BIT_REG, 2)
+		return binary.LittleEndian.Uint16(data)
 	}
-	return nil
 }
 
-// Motor stop
-// id: MotorId          Motor Id M1 or M2
-func (dev *Dev) MotorStop(id MotorId) error {
+func (h *Dev) GetMotorCurrent() float32 {
+	data, _ := h.readBytes(HBRIDGE_MOTOR_CURRENT_REG, 4)
+	var c float32
+	binary.Read(bytes.NewReader(data), binary.LittleEndian, &c)
+	return c
+}
 
-	if id == M1 {
-		dev.d.SetFullOff(_AIN1_CHANNEL)
-		dev.d.SetFullOff(_AIN2_CHANNEL)
-	} else if id == M2 {
-		dev.d.SetFullOff(_BIN1_CHANNEL)
-		dev.d.SetFullOff(_BIN2_CHANNEL)
-	} else {
-		return fmt.Errorf("wrong motor id")
-	}
-	return nil
+func (h *Dev) GetFirmwareVersion() (uint8, error) {
+	data, err := h.readBytes(HBRIDGE_FW_VERSION_REG, 1)
+	return data[0], err
+}
+
+func (h *Dev) GetI2CAddress() (uint8, error) {
+	data, err := h.readBytes(HBRIDGE_I2C_ADDRESS_REG, 1)
+	return data[0], err
+}
+
+func (h *Dev) JumpBootloader() error {
+	value := uint8(1)
+	return h.writeBytes(HBRIDGE_JUMP_TO_BOOTLOADER_REG, []uint8{value})
 }
