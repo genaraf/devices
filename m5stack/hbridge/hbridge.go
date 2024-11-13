@@ -34,7 +34,7 @@ const (
 	_12bit
 )
 
-// I2CAddr is the default I2C address for the m5stack ultrasnic.
+// I2CAddr is the default I2C address for the m5stack HBrige unit.
 const I2CAddr uint16 = HBRIDGE_I2C_ADDR
 
 // Opts holds the configuration options.
@@ -49,12 +49,12 @@ var DefaultOpts = Opts{
 	PwmFreq:    1500,
 }
 
-// Dev is an handle to an DFR0592 Motors driver.
+// Dev is an handle to an M5Stack HBrige Motors driver.
 type Dev struct {
 	c i2c.Dev
 }
 
-// New creates a new driver for CCS811 VOC sensor.
+// New creates a new driver for M5Stack HBrige motor driver.
 func New(bus i2c.Bus, opts *Opts) (*Dev, error) {
 	if opts.I2cAddress < 0x01 || opts.I2cAddress > 0x70 {
 		return nil, fmt.Errorf("invalid device address")
@@ -78,7 +78,7 @@ func (h *Dev) readBytes(reg int, size int) ([]uint8, error) {
 	return r, err
 }
 
-func (h *Dev) writeBytes(reg uint8, data []uint8) error {
+func (h *Dev) writeBytes(reg int, data []uint8) error {
 	d := []byte{byte(reg)}
 	d = append(d, data...)
 	return h.c.Tx(d, nil)
@@ -86,21 +86,33 @@ func (h *Dev) writeBytes(reg uint8, data []uint8) error {
 
 func (h *Dev) GetDriverDirection() (uint8, error) {
 	data, err := h.readBytes(HBRIDGE_CONFIG_REG, 1)
+	if err != nil {
+		return 0, err
+	}
 	return data[0], err
 }
 
 func (h *Dev) GetDriverSpeed8Bits() (uint8, error) {
 	data, err := h.readBytes(HBRIDGE_CONFIG_REG+1, 1)
+	if err != nil {
+		return 0, err
+	}
 	return data[0], err
 }
 
 func (h *Dev) GetDriverSpeed16Bits() (uint16, error) {
 	data, err := h.readBytes(HBRIDGE_CONFIG_REG+2, 2)
+	if err != nil {
+		return 0, err
+	}
 	return binary.LittleEndian.Uint16(data), err
 }
 
 func (h *Dev) GetDriverPWMFreq() (uint16, error) {
 	data, err := h.readBytes(HBRIDGE_CONFIG_REG+4, 2)
+	if err != nil {
+		return 0, err
+	}
 	return binary.LittleEndian.Uint16(data), err
 }
 
@@ -124,30 +136,45 @@ func (h *Dev) SetDriverSpeed16Bits(speed uint16) error {
 	return h.writeBytes(HBRIDGE_CONFIG_REG+2, data)
 }
 
-func (h *Dev) GetAnalogInput(bit HbridgeAnalogReadMode) uint16 {
+func (h *Dev) GetAnalogInput(bit HbridgeAnalogReadMode) (uint16, error) {
 	if bit == _8bit {
-		data, _ := h.readBytes(HBRIDGE_MOTOR_ADC_8BIT_REG, 1)
-		return uint16(data[0])
+		data, err := h.readBytes(HBRIDGE_MOTOR_ADC_8BIT_REG, 1)
+		if err != nil {
+			return 0, err
+		}
+		return uint16(data[0]), err
 	} else {
-		data, _ := h.readBytes(HBRIDGE_MOTOR_ADC_12BIT_REG, 2)
-		return binary.LittleEndian.Uint16(data)
+		data, err := h.readBytes(HBRIDGE_MOTOR_ADC_12BIT_REG, 2)
+		if err != nil {
+			return 0, err
+		}
+		return binary.LittleEndian.Uint16(data), err
 	}
 }
 
-func (h *Dev) GetMotorCurrent() float32 {
-	data, _ := h.readBytes(HBRIDGE_MOTOR_CURRENT_REG, 4)
+func (h *Dev) GetMotorCurrent() (float32, error) {
+	data, err := h.readBytes(HBRIDGE_MOTOR_CURRENT_REG, 4)
+	if err != nil {
+		return 0, err
+	}
 	var c float32
 	binary.Read(bytes.NewReader(data), binary.LittleEndian, &c)
-	return c
+	return c, err
 }
 
 func (h *Dev) GetFirmwareVersion() (uint8, error) {
 	data, err := h.readBytes(HBRIDGE_FW_VERSION_REG, 1)
+	if err != nil {
+		return 0, err
+	}
 	return data[0], err
 }
 
 func (h *Dev) GetI2CAddress() (uint8, error) {
 	data, err := h.readBytes(HBRIDGE_I2C_ADDRESS_REG, 1)
+	if err != nil {
+		return 0, err
+	}
 	return data[0], err
 }
 

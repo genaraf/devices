@@ -31,12 +31,15 @@ func TestDev_MotorMovement(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("hbridge version:%d", v)
+	fmt.Printf("hbridge version:%d\n", v)
 	m.SetDriverPWMFreq(1500)
 	m.SetDriverDirection(HBRIDGE_FORWARD)
 	for i := uint8(10); i <= 200; i += 10 {
 		m.SetDriverSpeed8Bits(i)
-		fmt.Printf("speed: %.d`\n", i)
+		anin, _ := m.GetAnalogInput(HBRIDGE_MOTOR_ADC_12BIT_REG)
+		cur, _ := m.GetMotorCurrent()
+		sp, err := m.GetDriverSpeed8Bits()
+		fmt.Printf("speed: %.d analogin:%d current:%f error:%v`\n", int(sp), int(anin), cur, err)
 		time.Sleep(1 * time.Second)
 	}
 
