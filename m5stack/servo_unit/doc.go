@@ -4,7 +4,7 @@
 // Package ultrsonic controls M5Stack I2C Ultrasonic unit via
 // I²C interface.
 //
-// Product page:  https://shop.m5stack.com/products/h-bridge-unitstm32f030
+// Product page:  https://shop.m5stack.com/products/8-channel-servo-driver-unit-stm32f030
 //
-//	Source code: https://github.com/m5stack/M5Unit-ExtEncoder/tree/main
-package hbridge
+//	Source code: https://github.com/m5stack/M5Unit-8Servo/tree/main
+package servo_unit
