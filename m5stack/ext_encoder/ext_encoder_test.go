@@ -31,4 +31,6 @@ func TestDev_ExtEncoder(t *testing.T) {
 		log.Fatal(err)
 	}
 	fmt.Printf("ext-encoder version:%d\n", v)
+	ms, err := m.GetMeterString()
+	fmt.Printf("meter string:%s err:%v \n", ms, err)
 }

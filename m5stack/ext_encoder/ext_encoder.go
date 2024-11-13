@@ -21,6 +21,14 @@ const (
 	I2C_ADDRESS_REG                       = 0xFF
 )
 
+type TriggerMode int
+
+const (
+	TRIGGER_MODE_ENDLESS TriggerMode = iota
+	TRIGGER_MODE_ZRISING
+	TRIGGER_MODE_ZFAILING
+)
+
 // I2CAddr is the default I2C address for the m5stack Exth.
 const I2CAddr uint16 = UNIT_EXT_ENCODER_ADDR
 
@@ -66,7 +74,7 @@ func (h *Dev) writeBytes(reg int, data []uint8) error {
 	return h.c.Tx(d, nil)
 }
 
-func (h *Dev) getEncoderValue() (uint32, error) {
+func (h *Dev) GetEncoderValue() (uint32, error) {
 	data, err := h.readBytes(UNIT_EXT_ENCODER_ENCODER_REG, 4)
 	if err != nil {
 		return 0, err
@@ -75,7 +83,7 @@ func (h *Dev) getEncoderValue() (uint32, error) {
 	return value, err
 }
 
-func (h *Dev) getZeroPulseValue() (uint32, error) {
+func (h *Dev) GetZeroPulseValue() (uint32, error) {
 	data, err := h.readBytes(UNIT_EXT_ENCODER_ZERO_PULSE_VALUE_REG, 4)
 	if err != nil {
 		return 0, err
@@ -84,13 +92,13 @@ func (h *Dev) getZeroPulseValue() (uint32, error) {
 	return value, err
 }
 
-func (h *Dev) setZeroPulseValue(value uint32) error {
+func (h *Dev) SetZeroPulseValue(value uint32) error {
 	data := make([]uint8, 4)
 	binary.LittleEndian.PutUint32(data, value)
 	return h.writeBytes(UNIT_EXT_ENCODER_ZERO_PULSE_VALUE_REG, data)
 }
 
-func (h *Dev) getMeterValue() (uint32, error) {
+func (h *Dev) GetMeterValue() (uint32, error) {
 	data, err := h.readBytes(UNIT_EXT_ENCODER_METER_REG, 4)
 	if err != nil {
 		return 0, err
@@ -99,7 +107,7 @@ func (h *Dev) getMeterValue() (uint32, error) {
 	return value, err
 }
 
-func (h *Dev) getMeterString() (string, error) {
+func (h *Dev) GetMeterString() (string, error) {
 	data, err := h.readBytes(UNIT_EXT_ENCODER_METER_STRING_REG, 9)
 	if err != nil {
 		return "", err
@@ -107,25 +115,25 @@ func (h *Dev) getMeterString() (string, error) {
 	return string(data), err
 }
 
-func (h *Dev) resetEncoder() error {
+func (h *Dev) ResetEncoder() error {
 	data := make([]uint8, 1)
 	data[0] = 1
 	return h.writeBytes(UNIT_EXT_ENCODER_RESET_REG, data)
 }
 
-func (h *Dev) setPerimeter(perimeter uint32) error {
+func (h *Dev) SetPerimeter(perimeter uint32) error {
 	data := make([]uint8, 8)
 	binary.LittleEndian.PutUint32(data, perimeter)
 	return h.writeBytes(UNIT_EXT_ENCODER_PERIMETER_REG, data)
 }
 
-func (h *Dev) setZeroMode(mode uint8) error {
+func (h *Dev) SetZeroMode(mode TriggerMode) error {
 	data := make([]uint8, 1)
-	data[0] = mode
+	data[0] = uint8(mode)
 	return h.writeBytes(UNIT_EXT_ENCODER_ZERO_MODE_REG, data)
 }
 
-func (h *Dev) getPerimeter() (uint32, error) {
+func (h *Dev) GetPerimeter() (uint32, error) {
 	data, err := h.readBytes(UNIT_EXT_ENCODER_PERIMETER_REG, 4)
 	if err != nil {
 		return 0, err
