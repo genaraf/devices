@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"time"
 
 	"periph.io/x/conn/v3/i2c"
 )
@@ -100,48 +99,25 @@ func (h *Dev) SetAllPinMode(mode ExtIOMode) error {
 	if err != nil {
 		return err
 	}
-	for i := uint8(0); i < 8; i++ {
-		time.Sleep(1 * time.Millisecond)
-		err := h.writeBytes(int(i), []uint8{data[i]})
-		if err != nil {
-			return err
-		}
-		time.Sleep(9 * time.Millisecond)
-	}
 	return nil
 }
 
 func (h *Dev) SetOnePinMode(pin uint8, mode ExtIOMode) error {
-	data := make([]uint8, 8)
-	for i := range data {
-		data[i] = mode
+	if pin > 8 {
+		return fmt.Errorf("wrong pin number")
 	}
-
-	if !h.writeBytes(pin, data, 1) {
-		return false
-	}
-	for i := uint8(0); i < 8; i++ {
-		time.Sleep(1 * time.Millisecond)
-		if !h.writeBytes(i, []uint8{data[i]}, 1) {
-			return false
-		}
-		time.Sleep(9 * time.Millisecond)
-	}
-	return nil
+	return h.writeBytes(M5_UNIT_8SERVO_MODE_REG+int(pin), []uint8{uint8(mode)})
 }
 
-func (h *Dev) SetDeviceAddr(addr uint8) error {
-	err := h.writeBytes(M5_UNIT_8SERVO_ADDRESS_REG, []uint8{addr}, 1)
-	if err == nil {
-		h.c.Addr = uint16(addr)
-		return nil
+func (h *Dev) GetOnePinMode(pin uint8) (ExtIOMode, error) {
+	if pin > 8 {
+		return 0, fmt.Errorf("wrong pin number")
 	}
-	return err
-}
-
-func (h *Dev) GetVersion() (uint8, error) {
-	data, err := m.readBytes(M5_UNIT_8SERVO_FW_VERSION_REG, 1)
-	return data[0], err
+	data, err := h.readBytes(M5_UNIT_8SERVO_MODE_REG+int(pin), 1)
+	if err != nil {
+		return 0, err
+	}
+	return ExtIOMode(data[0]), nil
 }
 
 func (h *Dev) SetDigitalOutput(pin uint8, state uint8) error {
@@ -221,11 +197,6 @@ func (h *Dev) GetServoCurrent() (float32, error) {
 	return c, nil
 }
 
-func (h *Dev) JumpBootloader() error {
-	value := uint8(1)
-	return h.writeBytes(JUMP_TO_BOOTLOADER_REG, []uint8{value})
-}
-
 func (h *Dev) SetI2CAddress(addr uint8) error {
 	err := h.writeBytes(JUMP_TO_BOOTLOADER_REG, []uint8{addr})
 	if err == nil {
@@ -248,4 +219,9 @@ func (h *Dev) GetI2CAddress() (uint8, error) {
 		return 0, err
 	}
 	return data[0], err
+}
+
+func (h *Dev) JumpBootloader() error {
+	value := uint8(1)
+	return h.writeBytes(JUMP_TO_BOOTLOADER_REG, []uint8{value})
 }
