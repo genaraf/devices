@@ -25,10 +25,13 @@ const (
 	TCS3472_GREEN_HIGH   = 0x19
 	TCS3472_BLUE_LOW     = 0x1A
 	TCS3472_BLUE_HIGH    = 0x1B
+)
 
-	TCS3472_POWER_ON  = 0x01
-	TCS3472_POWER_OFF = 0x00
-	TCS3472_AEN       = 0x02
+// Enable Register
+const (
+	TCS3472_POWER_ON  = 0x01 // Power ON. This bit activates the internal oscillator to permit the timers and ADC channels to operate.
+	TCS3472_POWER_OFF = 0x00 // Writing a 1 activates the oscillator. Writing a 0 disables the oscillator.
+	TCS3472_AEN       = 0x02 // RGBC enable. This bit actives the two-channel ADC. Writing a 1 activates the RGBC. Writing a 0 disables the RGBC
 )
 
 /*
@@ -38,10 +41,10 @@ const (
 type IntegrationTime int
 
 const (
-	TCS34725_INTEGRATIONTIME_2_4MS IntegrationTime = 0xFF // 2.4ms - 1 cycle - Max Count: 1024
-	TCS34725_INTEGRATIONTIME_24MS  IntegrationTime = 0xF6 // 24.0ms - 10 cycles - Max Count: 10240
-	TCS34725_INTEGRATIONTIME_50MS  IntegrationTime = 0xEB // 50.4ms - 21 cycles - Max Count: 21504
-	TCS34725_INTEGRATIONTIME_60MS  IntegrationTime = 0xE7 // 60.0ms - 25 cycles - Max Count: 25700
+	TCS34725_INTEGRATIONTIME_2_4MS IntegrationTime = 0xFF //  2.4ms - 1 cycle - Max Count: 1024
+	TCS34725_INTEGRATIONTIME_24MS  IntegrationTime = 0xF6 //  24.0ms - 10 cycles - Max Count: 10240
+	TCS34725_INTEGRATIONTIME_50MS  IntegrationTime = 0xEB //  50.4ms - 21 cycles - Max Count: 21504
+	TCS34725_INTEGRATIONTIME_60MS  IntegrationTime = 0xE7 //  60.0ms - 25 cycles - Max Count: 25700
 	TCS34725_INTEGRATIONTIME_101MS IntegrationTime = 0xD6 // 100.8ms - 42 cycles - Max Count: 43008
 	TCS34725_INTEGRATIONTIME_120MS IntegrationTime = 0xCE // 120.0ms - 50 cycles - Max Count: 51200
 	TCS34725_INTEGRATIONTIME_154MS IntegrationTime = 0xC0 // 153.6ms - 64 cycles - Max Count: 65535
@@ -57,6 +60,12 @@ const (
 	TCS34725_INTEGRATIONTIME_540MS IntegrationTime = 0x1F // 540.0ms - 225 cycles - Max Count: 65535
 	TCS34725_INTEGRATIONTIME_600MS IntegrationTime = 0x06 // 600.0ms - 250 cycles - Max Count: 65535
 	TCS34725_INTEGRATIONTIME_614MS IntegrationTime = 0x00 // 614.4ms - 256 cycles - Max Count: 65535
+)
+
+// Status Register TCS3472_STATUS
+const (
+	TCS34725_STATUS_AINT   = 0x10 // RGBC Clean channel interrupt
+	TCS34725_STATUS_AVALID = 0x01 // RGBC Valid. Indicates that the RGBC channels have completed an integration cycle.                                                \
 )
 
 type TCS34725Gain byte
@@ -238,6 +247,8 @@ func (h *Dev) GetRGB() (Color, error) {
 	return c, nil
 }
 
+// 0x44 = TCS34721 and TCS34725
+// 0x4D = TCS34723 and TCS34727
 func (h *Dev) GetId() (byte, error) {
 	data, err := h.readBytes(TCS3472_ID, 1)
 	if err != nil {
